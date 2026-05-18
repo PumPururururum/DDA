@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3954744ce7d84d54da827aeef5c02c1c, type: 3}
+  m_Name: GameLoopStaticData
+  m_EditorClassIdentifier: 
+  BaseEnemyCount: 2
+  AdditionalEnemiesPerLevel: 1
+  MaxEnemiesPerLevel: 10
+  BaseAmmoPickups: 1
+  BaseHealthPickups: 1
+  ResourceReductionEachTwoLevels: 1
+  NextLevelDelay: 2
