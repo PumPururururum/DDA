@@ -23,16 +23,16 @@ MonoBehaviour:
   NormalizedDamageTakenPerSecond: 25
   NormalizedCombo: 10
   NormalizedPickupsPerSecond: 0.5
-  KillWeight: 0.45
-  ComboWeight: 0.3
-  DamageWeight: 0.25
+  KillWeight: 0.7
+  ComboWeight: 0.2
+  DamageWeight: 0.07
   PerformanceGamma: 1.3
-  DamageTakenWeight: 0.5
-  AccuracyPenaltyWeight: 0.3
-  PickupsWeight: 0.2
+  DamageTakenWeight: 0.56
+  AccuracyPenaltyWeight: 0.42
+  PickupsWeight: 0.11
   InitialDifficulty: 0.4
   BetaUp: 0.1
-  BetaDown: 0.12
+  BetaDown: 0.06
   MaxDifficultyDelta: 0.15
   RuntimeTau: 2.5
   AudioTau: 0.6
@@ -45,3 +45,4 @@ MonoBehaviour:
   CountEnemyDespawnAsKill: 1
   EnableDebugLogs: 1
   DebugLogInterval: 2
+  ShowDebugHud: 1

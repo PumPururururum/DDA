@@ -7,6 +7,7 @@ using _Project.Code.Infrastructure;
 using _Project.Infrastructure;
 using Leopotam.EcsLite;
 using Leopotam.EcsLite.Di;
+using UnityEngine;
 
 namespace _ExampleProject.Code.Features._Core.Systems
 {
@@ -35,6 +36,10 @@ namespace _ExampleProject.Code.Features._Core.Systems
                 if (weaponData == null)
                     continue;
 
+                // Отсчитываем кулдаун каждый кадр независимо от действий игрока
+                if (weapon.FireCooldown > 0f)
+                    weapon.FireCooldown -= Time.deltaTime;
+
                 if (_inputService.IsReloadPressed)
                 {
                     if (!_reloadRequestPool.Value.Has(entity) && weapon.TotalAmmo > 0 && weapon.MagazineAmmo < weaponData.MaxMagazineSize)
@@ -42,7 +47,8 @@ namespace _ExampleProject.Code.Features._Core.Systems
                     continue;
                 }
 
-                if (!_inputService.IsShootHeld || _shootRequestPool.Value.Has(entity) || _reloadRequestPool.Value.Has(entity))
+                // Блокируем выстрел пока кулдаун не обнулился
+                if (!_inputService.IsShootHeld || _shootRequestPool.Value.Has(entity) || _reloadRequestPool.Value.Has(entity) || weapon.FireCooldown > 0f)
                     continue;
 
                 if (weapon.MagazineAmmo < weaponData.AmmoPerShot)
@@ -53,6 +59,7 @@ namespace _ExampleProject.Code.Features._Core.Systems
                 }
 
                 weapon.MagazineAmmo -= weaponData.AmmoPerShot;
+                weapon.FireCooldown = weaponData.FireRate; // запустить кулдаун
                 _shootRequestPool.Value.Add(entity).Setup(weaponData.BurstInterval, _inputService.AimWorldPosition);
             }
         }

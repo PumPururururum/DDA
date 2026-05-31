@@ -11,6 +11,12 @@ namespace _ExampleProject.Code.Features._Core.Components
         public WeaponId WeaponId;
         public int TotalAmmo;
         public int MagazineAmmo;
+        /// <summary>
+        /// Оставшееся время кулдауна выстрела (сек).
+        /// Отсчитывается PlayerShootInputSystem каждый кадр.
+        /// Новый выстрел разрешён только при FireCooldown &lt;= 0.
+        /// </summary>
+        public float FireCooldown;
 
         public void Setup(Transform firePointRef, WeaponId weaponId, int totalAmmo, int magazineAmmo)
         {
@@ -18,6 +24,7 @@ namespace _ExampleProject.Code.Features._Core.Components
             WeaponId = weaponId;
             TotalAmmo = totalAmmo;
             MagazineAmmo = magazineAmmo;
+            FireCooldown = 0f;
         }
     }
 }

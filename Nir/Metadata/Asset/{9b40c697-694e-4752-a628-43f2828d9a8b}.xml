@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects serializationModel="Studio.02.02.00">
+	<object class="EncodableAsset" id="{9b40c697-694e-4752-a628-43f2828d9a8b}">
+		<property name="assetPath">
+			<value>Arpegio/</value>
+		</property>
+		<relationship name="masterAssetFolder">
+			<destination>{0ee0e5ac-09d6-45c7-acdd-008e4dbb65bf}</destination>
+		</relationship>
+	</object>
+</objects>

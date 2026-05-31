@@ -11,13 +11,13 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 72b0eab5a6954804b878ff26c47da372, type: 3}
   m_Name: Enemy_Tank
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   Id: 2
   DifficultyWeight: 3
   Brain: {fileID: 11400000, guid: 1db2b2fac3e945a45a47551cdba9b709, type: 2}
   BrainTickInterval: 0.2
   MoveSpeed: 2
-  MaxHealth: 120
+  MaxHealth: 40
   Armour: 5
   Weapon: 1
   InitAmmo: 1000

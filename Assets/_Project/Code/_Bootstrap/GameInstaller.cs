@@ -8,6 +8,7 @@ using _ExampleProject.Code.Features.Projectile.Systems;
 using _ExampleProject.Code.Infrastructure.InputService;
 using _ExampleProject.Code.Infrastructure.StaticData.BehaviourTree;
 using _Project.Code.Core.Abstractions.Contracts;
+using _Project.Code.Features.AdaptiveDifficulty;
 using _Project.Code.Features.Locale.MemoryPool.Systems;
 using _Project.Code.Features.Resources.Factory;
 using _Project.Code.Features.Resources.Systems;
@@ -101,12 +102,17 @@ namespace _Project.Code._Bootstrap
 
         private void BindAudio()
         {
-            ServiceLocator.Bind<IConstruct, ITick, ICleanUp>(new DynamicSoundtrackSystem());
+            ServiceLocator.Bind<IConstruct, IInit, ITick, ICleanUp>(new DynamicSoundtrackSystem());
         }
 
         private void BindUi()
         {
             ServiceLocator.Bind<IConstruct, ITick, ICleanUp>(new PlayerHudSystem());
+
+            // Дебаг-оверлей системы адаптивной сложности.
+            // Показывает D, I, S, интенсивность, EMA-метрики, комбо, всего убийств.
+            // Переключить в игре: F1. В релизном билде автоматически скрыт.
+            ServiceLocator.Bind<IConstruct, ITick, ICleanUp>(new AdaptiveDifficultyDebugSystem());
         }
     }
 }

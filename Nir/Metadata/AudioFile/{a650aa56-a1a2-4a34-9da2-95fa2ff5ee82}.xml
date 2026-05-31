@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects serializationModel="Studio.02.02.00">
+	<object class="AudioFile" id="{a650aa56-a1a2-4a34-9da2-95fa2ff5ee82}">
+		<property name="assetPath">
+			<value>Ambient/Ambient1.wav</value>
+		</property>
+		<property name="frequencyInKHz">
+			<value>48</value>
+		</property>
+		<property name="channelCount">
+			<value>2</value>
+		</property>
+		<property name="length">
+			<value>9.8897083333333331</value>
+		</property>
+		<relationship name="masterAssetFolder">
+			<destination>{0ee0e5ac-09d6-45c7-acdd-008e4dbb65bf}</destination>
+		</relationship>
+	</object>
+</objects>

@@ -180,6 +180,9 @@ namespace _ExampleProject.Code.Features._Core.Systems
             _currentLevel = 0;
             _isSpawningLevel = false;
 
+            // При рестарте после смерти возобновить сбор телеметрии
+            ProjectAdaptiveDifficultyBootstrap.Instance?.ResumeCollection();
+
             if (!HasPlayer() && _playerSpawnPosition != null)
                 _playerFactory.Create(_playerSpawnPosition.SpawnPosition);
             else
@@ -450,6 +453,10 @@ namespace _ExampleProject.Code.Features._Core.Systems
         {
             _isExitOpen = true;
             _exitRequested = false;
+
+            // Остановить сбор телеметрии: все враги убиты, уровень завершён.
+            // Время ожидания игроком перехода не должно влиять на сложность.
+            ProjectAdaptiveDifficultyBootstrap.Instance?.PauseCollection();
 
             if (_exitObject != null)
                 return;

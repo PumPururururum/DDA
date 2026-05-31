@@ -16,5 +16,10 @@ namespace _ExampleProject.Code.Infrastructure.StaticData.Weapons
         public int AmmoPerShot;
         public float ReloadTime;
         public float ShootSpeed;
+        /// <summary>
+        /// Минимальное время (сек) между двумя выстрелами.
+        /// Новый выстрел блокируется, пока кулдаун не обнулится.
+        /// </summary>
+        public float FireRate;
     }
 }

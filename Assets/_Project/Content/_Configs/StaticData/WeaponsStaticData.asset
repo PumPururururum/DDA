@@ -20,6 +20,7 @@ MonoBehaviour:
     BurstsPerShot: 3
     BurstInterval: 0.2
     ProjectilesPerBurst: 1
-    AmmoPerShot: 3
+    AmmoPerShot: 1
     ReloadTime: 0.1
     ShootSpeed: 1
+    FireRate: 0.1

@@ -1,5 +1,6 @@
 using AdaptiveDifficulty.Runtime;
 using _ExampleProject.Code.Features._Core.Components;
+using _ExampleProject.Code.Features.Player.Components;
 using _ExampleProject.Code.Features.Projectile.Factory;
 using _ExampleProject.Code.Infrastructure.StaticData.Weapons;
 using _Project.Code.Features.Test;
@@ -18,6 +19,7 @@ namespace _ExampleProject.Code.Features._Core.Systems
         private readonly EcsPoolInject<Weapon> _weaponPool;
         private readonly EcsPoolInject<CombatTeam> _teamPool;
         private readonly EcsPoolInject<UnityTransform> _transformPool;
+        private readonly EcsPoolInject<PlayerTag> _playerTagPool;
 
         private WeaponsStaticData _weaponsStaticData;
         private IProjectileFactory _projectileFactory;
@@ -69,7 +71,9 @@ namespace _ExampleProject.Code.Features._Core.Systems
                 }
 
                 requestData.BurstCount += 1;
-                if (requestData.BurstCount >= weaponData.BurstsPerShot)
+                // Игрок всегда стреляет одной пулей — лимит BurstsPerShot = 1 для него
+                int maxBursts = _playerTagPool.Value.Has(entity) ? 1 : weaponData.BurstsPerShot;
+                if (requestData.BurstCount >= maxBursts)
                     _requestPool.Value.Del(entity);
             }
         }

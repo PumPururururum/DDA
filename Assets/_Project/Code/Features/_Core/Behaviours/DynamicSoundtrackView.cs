@@ -1,82 +1,190 @@
 using UnityEngine;
+using FMOD.Studio;
+using FMODUnity;
+using _ExampleProject.Code.Features._Core.Audio;
 
 namespace _ExampleProject.Code.Features._Core.Behaviours
 {
+    /// <summary>
+    /// MonoBehaviour-фасад динамического саундтрека.
+    ///
+    /// Инкапсулирует работу с музыкальным событием FMOD: создаёт EventInstance,
+    /// запускает его воспроизведение и управляет стадией саундтрека через
+    /// параметр musicState. Игровой код не управляет громкостью отдельных слоёв
+    /// напрямую — он лишь передаёт текущее значение RuntimeIntensity, а фасад
+    /// сам выбирает дискретную стадию с гистерезисом и вызывает setParameterByName.
+    ///
+    /// Стадии и пороги перехода (задаются в инспекторе):
+    ///   RuntimeIntensity в [0,   AmbientToLeadThreshold)  → Ambient
+    ///   RuntimeIntensity в [A,   LeadToDrumsThreshold)    → Lead
+    ///   RuntimeIntensity в [L,   1]                       → DrumsBass
+    ///   При старте уровня принудительно устанавливается Intro.
+    ///
+    /// Гистерезис: переход на более высокую стадию происходит при достижении
+    /// верхнего порога, возврат — при снижении ниже (порог − HysteresisMargin).
+    /// Это исключает «дребезг» при колебаниях интенсивности вблизи границы.
+    /// </summary>
+    [DefaultExecutionOrder(-200)]
     public sealed class DynamicSoundtrackView : MonoBehaviour
     {
-        [Header("Layered soundtrack sources")]
-        [SerializeField] private AudioSource _calmLayer;
-        [SerializeField] private AudioSource _combatLayer;
-        [SerializeField] private AudioSource _dangerLayer;
+        // ─── FMOD ─────────────────────────────────────────────────────────────
 
-        [Header("Mix")]
-        [SerializeField, Range(0f, 1f)] private float _masterVolume = 1f;
-        [SerializeField, Min(0.01f)] private float _fadeSpeed = 2.5f;
-        [SerializeField] private bool _playLayersOnStart = true;
+        [Header("FMOD")]
+        [Tooltip("Путь к музыкальному событию FMOD, например: event:/Music/GameplayMusic")]
 
-        private float _targetCalm;
-        private float _targetCombat;
-        private float _targetDanger;
+
+        [SerializeField] private string _musicStateParam = "musicState";
+
+        // ─── Пороги переключения стадий ───────────────────────────────────────
+
+        [Header("Пороги стадий")]
+        [Tooltip("RuntimeIntensity, при котором происходит переход Ambient → Lead.\n" +
+                 "Рекомендуется: 0.33")]
+        [Range(0f, 1f)] public float AmbientToLeadThreshold  = 0.33f;
+
+        [Tooltip("RuntimeIntensity, при котором происходит переход Lead → DrumsBass.\n" +
+                 "Рекомендуется: 0.66")]
+        [Range(0f, 1f)] public float LeadToDrumsThreshold    = 0.66f;
+
+        [Tooltip("Ширина зоны гистерезиса. Возврат на предыдущую стадию происходит\n" +
+                 "при снижении ниже (порог - HysteresisMargin).\n" +
+                 "Рекомендуется: 0.05–0.10")]
+        [Range(0f, 0.3f)] public float HysteresisMargin      = 0.07f;
+
+        // ─── Приватные поля ───────────────────────────────────────────────────
+
+        private EventInstance _eventInstance;
+        private MusicState    _currentState = MusicState.Intro;
+        private bool          _isStarted;
+
+        // ─── MonoBehaviour ────────────────────────────────────────────────────
 
         private void Awake()
         {
-            PrepareLayer(_calmLayer);
-            PrepareLayer(_combatLayer);
-            PrepareLayer(_dangerLayer);
+            _eventInstance = RuntimeManager.CreateInstance("event:/Music");
         }
 
-        private void Start()
+        private void OnDestroy()
         {
-            if (!_playLayersOnStart)
+            if (_eventInstance.isValid())
+            {
+                _eventInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
+                _eventInstance.release();
+            }
+        }
+
+        // ─── Публичный API ────────────────────────────────────────────────────
+
+        /// <summary>Текущая активная стадия саундтрека. Используется в дебаг-оверлее.</summary>
+        public MusicState CurrentState => _currentState;
+
+        /// <summary>
+        /// Запустить воспроизведение музыкального события и установить стадию Intro.
+        /// Вызывается из DynamicSoundtrackSystem при инициализации уровня.
+        /// </summary>
+        public void StartLevel()
+        {
+            // Защита: если Awake не успел создать экземпляр — создаём здесь
+            if (!_eventInstance.isValid())
+                _eventInstance = RuntimeManager.CreateInstance("event:/Music");
+
+            if (!_eventInstance.isValid())
+            {
+                Debug.LogError("[DynamicSoundtrackView] FMOD event:/Music не найден. Проверь имя события в FMOD Studio.");
+                return;
+            }
+
+            _currentState = MusicState.Intro;
+            ApplyState(_currentState);
+
+            if (!_isStarted)
+            {
+                _eventInstance.start();
+                _isStarted = true;
+            }
+        }
+
+        /// <summary>
+        /// Обновить музыкальное состояние на основе текущего значения RuntimeIntensity.
+        /// Вызывается из DynamicSoundtrackSystem каждый кадр.
+        ///
+        /// Переключение выполняется только при фактическом изменении стадии,
+        /// чтобы не вызывать setParameterByName на каждом кадре без нужды.
+        /// Гистерезис предотвращает частые переключения при колебаниях вблизи порога.
+        /// </summary>
+        /// <param name="runtimeIntensity">Сглаженная интенсивность ∈ [0, 1].</param>
+        public void SetIntensity(float runtimeIntensity)
+        {
+            if (!_eventInstance.isValid())
                 return;
 
-            PlayIfReady(_calmLayer);
-            PlayIfReady(_combatLayer);
-            PlayIfReady(_dangerLayer);
-        }
+            MusicState target = ComputeTargetState(runtimeIntensity);
 
-        private void Update()
-        {
-            ApplyVolume(_calmLayer, _targetCalm);
-            ApplyVolume(_combatLayer, _targetCombat);
-            ApplyVolume(_dangerLayer, _targetDanger);
-        }
-
-        public void SetIntensity(float intensity)
-        {
-            intensity = Mathf.Clamp01(intensity);
-
-            _targetCalm = (1f - Mathf.SmoothStep(0.15f, 0.75f, intensity)) * _masterVolume;
-            _targetCombat = Mathf.SmoothStep(0.15f, 0.65f, intensity) * (1f - 0.35f * Mathf.SmoothStep(0.8f, 1f, intensity)) * _masterVolume;
-            _targetDanger = Mathf.SmoothStep(0.55f, 1f, intensity) * _masterVolume;
-        }
-
-        private void ApplyVolume(AudioSource source, float target)
-        {
-            if (source == null)
+            if (target == _currentState)
                 return;
 
-            if (_playLayersOnStart && source.clip != null && !source.isPlaying)
-                source.Play();
-
-            source.volume = Mathf.MoveTowards(source.volume, target, _fadeSpeed * Time.deltaTime);
+            _currentState = target;
+            ApplyState(_currentState);
         }
 
-        private static void PrepareLayer(AudioSource source)
+        /// <summary>
+        /// Принудительно остановить музыку (например, при завершении уровня).
+        /// </summary>
+        public void Stop()
         {
-            if (source == null)
-                return;
-
-            source.loop = true;
-            source.playOnAwake = false;
+            if (_eventInstance.isValid())
+                _eventInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
         }
 
-        private static void PlayIfReady(AudioSource source)
-        {
-            if (source == null || source.clip == null || source.isPlaying)
-                return;
+        // ─── Приватные методы ─────────────────────────────────────────────────
 
-            source.Play();
+        /// <summary>
+        /// Вычислить целевую стадию с учётом гистерезиса.
+        ///
+        /// Повышение стадии: при достижении верхнего порога.
+        /// Понижение стадии: при снижении ниже (порог - HysteresisMargin).
+        /// Стадия Intro сбрасывается в Ambient при первом ненулевом вызове SetIntensity.
+        /// </summary>
+        private MusicState ComputeTargetState(float intensity)
+        {
+            // Intro → Ambient при первом обновлении интенсивности
+            if (_currentState == MusicState.Intro)
+                return MusicState.Ambient;
+
+            float hysteresis = HysteresisMargin;
+
+            switch (_currentState)
+            {
+                case MusicState.Ambient:
+                    if (intensity >= AmbientToLeadThreshold)
+                        return MusicState.Lead;
+                    break;
+
+                case MusicState.Lead:
+                    if (intensity >= LeadToDrumsThreshold)
+                        return MusicState.DrumsBass;
+                    if (intensity < AmbientToLeadThreshold - hysteresis)
+                        return MusicState.Ambient;
+                    break;
+
+                case MusicState.DrumsBass:
+                    if (intensity < LeadToDrumsThreshold - hysteresis)
+                        return MusicState.Lead;
+                    break;
+            }
+
+            return _currentState;
+        }
+
+        /// <summary>
+        /// Передать числовое значение стадии в FMOD через setParameterByName.
+        /// Плавность перехода между слоями обеспечивается средствами FMOD Studio
+        /// (времена нарастания/затухания задаются в проекте FMOD, не в коде).
+        /// </summary>
+        private void ApplyState(MusicState state)
+        {
+            _eventInstance.setParameterByName(_musicStateParam, (float)state);
         }
     }
 }
+

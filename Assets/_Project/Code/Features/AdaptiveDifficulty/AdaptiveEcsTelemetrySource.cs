@@ -4,18 +4,31 @@ using UnityEngine;
 
 namespace _Project.Code.Features.AdaptiveDifficulty
 {
+    /// <summary>
+    /// ECS-источник телеметрии для системы адаптивной сложности.
+    /// Накапливает события за кадр и предоставляет их контроллеру через IAdaptiveTelemetrySource.
+    ///
+    /// События поступают из:
+    ///   - WeaponShootSystem → ReportShot
+    ///   - ProjectileCollisionSystem → ReportDamage
+    ///   - EnemyDeathSystem → ReportEnemyKilled
+    ///   - ResourcePickupSystem → ReportPickup
+    /// </summary>
     public sealed class AdaptiveEcsTelemetrySource : IAdaptiveTelemetrySource
     {
         private readonly AdaptiveDifficultySettings _settings;
         private readonly AdaptiveFrameTelemetry _frame = new();
 
         private float _comboTimer;
-        private int _currentCombo;
+        private int   _currentCombo;
+        private int   _totalKillsThisRun;
 
         public AdaptiveEcsTelemetrySource(AdaptiveDifficultySettings settings)
         {
             _settings = settings;
         }
+
+        // ─── IAdaptiveTelemetrySource ────────────────────────────────────────
 
         public bool IsReady => true;
 
@@ -29,15 +42,15 @@ namespace _Project.Code.Features.AdaptiveDifficulty
 
         public AdaptiveFrameTelemetry ConsumeFrameTelemetry()
         {
-            AdaptiveFrameTelemetry output = new AdaptiveFrameTelemetry
+            var output = new AdaptiveFrameTelemetry
             {
-                Kills = _frame.Kills,
-                DamageDealt = _frame.DamageDealt,
-                DamageTaken = _frame.DamageTaken,
-                Shots = _frame.Shots,
-                Hits = _frame.Hits,
-                Combo = _frame.Combo,
-                AmmoPicked = _frame.AmmoPicked,
+                Kills        = _frame.Kills,
+                DamageDealt  = _frame.DamageDealt,
+                DamageTaken  = _frame.DamageTaken,
+                Shots        = _frame.Shots,
+                Hits         = _frame.Hits,
+                Combo        = _frame.Combo,
+                AmmoPicked   = _frame.AmmoPicked,
                 HealthPicked = _frame.HealthPicked
             };
 
@@ -45,6 +58,17 @@ namespace _Project.Code.Features.AdaptiveDifficulty
             return output;
         }
 
+        // ─── Публичные свойства для дебаг-дисплея ────────────────────────────
+
+        /// <summary>Текущая длина активного комбо (сбрасывается при паузе > ComboResetDelay).</summary>
+        public int CurrentCombo => _currentCombo;
+
+        /// <summary>Общее количество убийств с начала текущего запуска/рестарта.</summary>
+        public int TotalKillsThisRun => _totalKillsThisRun;
+
+        // ─── Точки вызова из ECS-систем ──────────────────────────────────────
+
+        /// <summary>Вызывается из WeaponShootSystem при каждом выстреле.</summary>
         public void ReportShot(CombatTeamId shooterTeam)
         {
             if (shooterTeam != CombatTeamId.Player)
@@ -53,6 +77,7 @@ namespace _Project.Code.Features.AdaptiveDifficulty
             _frame.Shots += 1;
         }
 
+        /// <summary>Вызывается из ProjectileCollisionSystem при нанесении/получении урона.</summary>
         public void ReportDamage(CombatTeamId sourceTeam, CombatTeamId targetTeam, int damage)
         {
             if (damage <= 0)
@@ -60,7 +85,7 @@ namespace _Project.Code.Features.AdaptiveDifficulty
 
             if (sourceTeam == CombatTeamId.Player && targetTeam == CombatTeamId.Enemy)
             {
-                _frame.Hits += 1;
+                _frame.Hits       += 1;
                 _frame.DamageDealt += damage;
                 return;
             }
@@ -69,12 +94,15 @@ namespace _Project.Code.Features.AdaptiveDifficulty
                 _frame.DamageTaken += damage;
         }
 
+        /// <summary>Вызывается из EnemyDeathSystem при смерти врага.</summary>
         public void ReportEnemyKilled()
         {
             _frame.Kills += 1;
+            _totalKillsThisRun += 1;
             RegisterComboKill();
         }
 
+        /// <summary>Вызывается из ResourcePickupSystem при подборе ресурса.</summary>
         public void ReportPickup(AdaptivePickupType pickupType)
         {
             switch (pickupType)
@@ -88,12 +116,25 @@ namespace _Project.Code.Features.AdaptiveDifficulty
             }
         }
 
-        public void RegisterProjectileCollision(int projectileEntity, GameObject collisionRef)
+        /// <summary>
+        /// Совместимость с устаревшими префабами, использующими AdaptiveProjectileCollisionRelay.
+        /// Урон и статистика попаданий теперь отслеживаются из ProjectileCollisionSystem,
+        /// поэтому метод намеренно оставлен пустым.
+        /// </summary>
+        public void RegisterProjectileCollision(int projectileEntity, UnityEngine.GameObject collisionRef)
         {
-            // Compatibility hook for old prefabs with AdaptiveProjectileCollisionRelay.
-            // Damage and hit telemetry are reported from ProjectileCollisionSystem now,
-            // so this method intentionally does not touch health or difficulty stats.
         }
+
+        /// <summary>Сбросить накопленную статистику (при рестарте игры).</summary>
+        public void ResetRunStats()
+        {
+            _totalKillsThisRun = 0;
+            _currentCombo      = 0;
+            _comboTimer        = 0f;
+            _frame.Reset();
+        }
+
+        // ─── Вспомогательные ─────────────────────────────────────────────────
 
         private void RegisterComboKill()
         {
@@ -104,8 +145,8 @@ namespace _Project.Code.Features.AdaptiveDifficulty
             else
                 _currentCombo = 1;
 
-            _comboTimer = 0f;
-            _frame.Combo = Mathf.Max(_frame.Combo, _currentCombo);
+            _comboTimer    = 0f;
+            _frame.Combo   = Mathf.Max(_frame.Combo, _currentCombo);
         }
     }
 }
